@@ -46,21 +46,21 @@ class KeepTrackImporter:
 
     ( category, numpy_type, pytables_type ) = self._table_settings(name);
 
-    data = [ ];
-    for value in watch:
-      tm = np.int64(value.attrib["time"])*1000000000;
-
-      if (data_type == "number"):
-        try:
-          val = numpy_type(value.text);
-        except ValueError:
-          print("ERROR importing %s - invalid value \"%s\" for type \"%s\"" % ( name, value.text, str(numpy_type) ));
-          exit();
-
-      if (data_type == "number"):
-        data.append([ tm, self.tz, val ]);
-      elif (data_type == "marker"):
-        data.append([ tm, self.tz ]);
+    if (data_type == "number"):
+      data = self.parse_number_data(watch, numpy_type);
+      descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1), "value": pytables_type(pos=2) };
+      units_attr = { "time": "ns since the epoch", "tz": "15 min blocks from UTC", "value": unit };
+    elif (data_type == "marker"):
+      data = self.parse_marker_data(watch);
+      descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1) };
+      units_attr = { "time": "ns since the epoch", "tz": "15 min blocks from UTC" };
+    elif (data_type == "set"):
+      ( data, unit ) = self.parse_set_data(watch);
+      descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1), "value": description.Int16Col(pos=2) };
+      units_attr = { "time": "ns since the epoch", "tz": "15 min blocks from UTC", "value": unit };
+    else:
+      print("Unknown KeepTrack data type: %s" % ( data_type ));
+      return;
 
     table_name = self._table_name(name);
     if (len(data) == 0):
@@ -72,16 +72,50 @@ class KeepTrackImporter:
     try:
       t = self.fd.getNode("/self/%s/%s" % ( category, table_name ));
     except exceptions.NoSuchNodeError:
-      if (data_type == "number"):
-        descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1), "value": pytables_type(pos=2) };
-      elif (data_type == "marker"):
-        descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1) };
-      else:
-        print("Unknown KeepTrack data type: %s" % ( data_type ));
-        return;
       t = self.fd.createTable("/self/%s" % ( category ), table_name, descr, name, filters=self.filters, createparents=True);
       t.attrs["units"] = { "time": "ns since the epoch", "tz": "15 min blocks from UTC", "value": unit };
     t.append(data);
+
+  def parse_number_data(self, watch, numpy_type):
+    data = [ ];
+    for value in watch.findall("value"):
+      tm = np.int64(value.attrib["time"])*1000000000;
+
+      try:
+        val = numpy_type(value.text);
+      except ValueError:
+        print("ERROR importing %s - invalid value \"%s\" for type \"%s\"" % ( name, value.text, str(numpy_type) ));
+        exit();
+
+      data.append([ tm, self.tz, val ]);
+
+    return data;
+
+  def parse_marker_data(self, watch):
+    data = [ ];
+    for value in watch.findall("value"):
+      tm = np.int64(value.attrib["time"])*1000000000;
+      data.append([ tm, self.tz ]);
+
+    return data;
+
+  def parse_set_data(self, watch):
+    data = [ ];
+    values = dict();
+    i = 0;
+    unit = "";
+    for predefined in watch.findall("predefined"):
+      values[predefined.text] = i;
+      unit = "%s, %d: %s" % ( unit, i, predefined.text );
+      i = i + 1;
+    unit = unit[2:];
+
+    for value in watch.findall("value"):
+      tm = np.int64(value.attrib["time"])*1000000000;
+      val = values[value.text];
+      data.append([ tm, self.tz, val ]);
+
+    return ( data, unit );
 
   def parse_configuration_file(self, filename):
     try:

@@ -1,3 +1,4 @@
+import hdfqs;
 import numpy as np;
 import re;
 from tables import description, Filters, openFile, exceptions;
@@ -6,7 +7,7 @@ import xml.etree.ElementTree as et;
 class KeepTrackImporter:
 
   name = "KeepTrack";
-  args = [ { "name": "-c", "type": str, "default": None, "help": "Configuration file" } ];
+  args = [ { "name": "-c", "type": str, "default": None, "help": "Configuration file" }, { "name": "-p", "type": str, "default": None, "help": "HDFQS location" } ];
 
   def __init__(self, config):
     self.input_filename = config.input_filename;
@@ -21,6 +22,10 @@ class KeepTrackImporter:
     self.watch_config = dict();
     if (config.c is not None):
       self.parse_configuration_file(config.c);
+    if (config.p is not None):
+      self.hdfqs = hdfqs.HDFQS(config.p);
+    else:
+      self.hdfqs = None;
 
   def convert(self):
     pass;
@@ -45,24 +50,31 @@ class KeepTrackImporter:
       unit = None;
 
     ( category, numpy_type, pytables_type ) = self._table_settings(name);
+    table_name = self._table_name(name);
+    if (self.hdfqs is not None):
+      if (self.hdfqs.exists("self", category, table_name)):
+        start_after = self.hdfqs.get_time_range("self", category, table_name)[1];
+      else:
+        start_after = 0;
+    else:
+      start_after = 0;
 
     if (data_type == "number"):
-      data = self.parse_number_data(watch, numpy_type);
+      data = self.parse_number_data(watch, numpy_type, start_after);
       descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1), "value": pytables_type(pos=2) };
       units_attr = { "time": "ns since the epoch", "tz": "15 min blocks from UTC", "value": unit };
     elif (data_type == "marker"):
-      data = self.parse_marker_data(watch);
+      data = self.parse_marker_data(watch, start_after);
       descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1) };
       units_attr = { "time": "ns since the epoch", "tz": "15 min blocks from UTC" };
     elif (data_type == "set"):
-      ( data, unit ) = self.parse_set_data(watch);
+      ( data, unit ) = self.parse_set_data(watch, start_after);
       descr = { "time": description.Int64Col(pos=0), "tz": description.Int8Col(pos=1), "value": description.Int16Col(pos=2) };
       units_attr = { "time": "ns since the epoch", "tz": "15 min blocks from UTC", "value": unit };
     else:
       print("Unknown KeepTrack data type: %s" % ( data_type ));
       return;
 
-    table_name = self._table_name(name);
     if (len(data) == 0):
       print("Skipping %s - no data." % ( name ));
       return;
@@ -75,11 +87,16 @@ class KeepTrackImporter:
       t = self.fd.createTable("/self/%s" % ( category ), table_name, descr, name, filters=self.filters, createparents=True);
       t.attrs["units"] = { "time": "ns since the epoch", "tz": "15 min blocks from UTC", "value": unit };
     t.append(data);
+    if (not t.cols.time.is_indexed):
+      t.cols.time.create_csindex();
+    t.flush();
 
-  def parse_number_data(self, watch, numpy_type):
+  def parse_number_data(self, watch, numpy_type, start_after):
     data = [ ];
     for value in watch.findall("value"):
       tm = np.int64(value.attrib["time"])*1000000000;
+      if (tm <= start_after):
+        continue;
 
       try:
         val = numpy_type(value.text);
@@ -91,15 +108,17 @@ class KeepTrackImporter:
 
     return data;
 
-  def parse_marker_data(self, watch):
+  def parse_marker_data(self, watch, start_after):
     data = [ ];
     for value in watch.findall("value"):
       tm = np.int64(value.attrib["time"])*1000000000;
+      if (tm <= start_after):
+        continue;
       data.append([ tm, self.tz ]);
 
     return data;
 
-  def parse_set_data(self, watch):
+  def parse_set_data(self, watch, start_after):
     data = [ ];
     values = dict();
     i = 0;
@@ -112,6 +131,8 @@ class KeepTrackImporter:
 
     for value in watch.findall("value"):
       tm = np.int64(value.attrib["time"])*1000000000;
+      if (tm <= start_after):
+        continue;
       val = values[value.text];
       data.append([ tm, self.tz, val ]);
 

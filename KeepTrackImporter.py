@@ -2,12 +2,13 @@ import hdfqs;
 import numpy as np;
 import re;
 from tables import description, Filters, openFile, exceptions;
+from time import localtime;
 import xml.etree.ElementTree as et;
 
 class KeepTrackImporter:
 
   name = "KeepTrack";
-  args = [ { "name": "-c", "type": str, "default": None, "help": "Configuration file" }, { "name": "-p", "type": str, "default": None, "help": "HDFQS location" } ];
+  args = [ { "name": "-c", "type": str, "default": None, "help": "Configuration file" }, { "name": "-p", "type": str, "default": None, "help": "HDFQS location" }, { "name": "--nodst", "action": "store_true", "help": "Don't apply Daylight Saving Time to specified timezone" } ];
 
   def __init__(self, config):
     self.input_filename = config.input_filename;
@@ -26,6 +27,7 @@ class KeepTrackImporter:
       self.hdfqs = hdfqs.HDFQS(config.p);
     else:
       self.hdfqs = None;
+    self.nodst = config.nodst;
 
   def convert(self):
     pass;
@@ -94,9 +96,13 @@ class KeepTrackImporter:
   def parse_number_data(self, watch, numpy_type, start_after):
     data = [ ];
     for value in watch.findall("value"):
-      tm = np.int64(value.attrib["time"])*1000000000;
+      t = np.int64(value.attrib["time"]);
+      tm = t*1000000000;
       if (tm <= start_after):
         continue;
+
+      isdst = ((localtime(t).tm_isdst == 1) and (not self.nodst));
+      tz = (self.tz - 4) if (isdst) else self.tz;
 
       try:
         val = numpy_type(value.text);
@@ -104,17 +110,22 @@ class KeepTrackImporter:
         print("ERROR importing %s - invalid value \"%s\" for type \"%s\"" % ( name, value.text, str(numpy_type) ));
         exit();
 
-      data.append([ tm, self.tz, val ]);
+      data.append([ tm, tz, val ]);
 
     return data;
 
   def parse_marker_data(self, watch, start_after):
     data = [ ];
     for value in watch.findall("value"):
-      tm = np.int64(value.attrib["time"])*1000000000;
+      t = np.int64(value.attrib["time"]);
+      tm = t*1000000000;
       if (tm <= start_after):
         continue;
-      data.append([ tm, self.tz ]);
+
+      isdst = ((localtime(t).tm_isdst == 1) and (not self.nodst));
+      tz = (self.tz - 4) if (isdst) else self.tz;
+
+      data.append([ tm, tz ]);
 
     return data;
 
@@ -130,11 +141,16 @@ class KeepTrackImporter:
     unit = unit[2:];
 
     for value in watch.findall("value"):
-      tm = np.int64(value.attrib["time"])*1000000000;
+      t = np.int64(value.attrib["time"]);
+      tm = t*1000000000;
       if (tm <= start_after):
         continue;
+
+      isdst = ((localtime(t).tm_isdst == 1) and (not self.nodst));
+      tz = (self.tz - 4) if (isdst) else self.tz;
+
       val = values[value.text];
-      data.append([ tm, self.tz, val ]);
+      data.append([ tm, tz, val ]);
 
     return ( data, unit );
 

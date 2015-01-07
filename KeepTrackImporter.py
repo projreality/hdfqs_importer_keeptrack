@@ -20,12 +20,37 @@ from tables import description, Filters, openFile, exceptions;
 from time import localtime;
 import xml.etree.ElementTree as et;
 
+__version__ = "1.0.0";
+
 class KeepTrackImporter:
+
+  """
+  This class wraps all functionality to import KeepTrack XML files into HDFQS.
+  """
 
   name = "KeepTrack";
   args = [ { "name": "-c", "type": str, "default": None, "help": "Configuration file" }, { "name": "-p", "type": str, "default": None, "help": "HDFQS location" }, { "name": "--nodst", "action": "store_true", "help": "Don't apply Daylight Saving Time to specified timezone" } ];
 
   def __init__(self, config):
+    """
+    Create the importer object.
+
+    Parameters
+    ----------
+    config : Namespace
+
+      input_filename : str
+        KeepTrack XML file to import.
+      output_filename : str
+        HDF5 file to write imported data to.
+      tz : int
+        Timezone of the imported data, specified in seconds west of UTC (i.e. west of UTC is positive, east of UTC is negative). Note - for regions with Daylight Saving Time, specify the Standard Time timezone, NOT the Daylight Time timezone, regardless of when the data was taken. For example, for Pacific Time, specify 28800 (8 hours), not 25200 (7 hours). Daylight Saving Time will be applied automatically.
+      p : str
+        Path to HDFQS data store (for incremental import).
+      nodst : bool
+        Do not apply Daylight Saving Time to timezone.
+    """
+
     self.input_filename = config.input_filename;
     self.output_filename = config.output_filename;
     self.tz = config.tz / (60*15);
@@ -48,6 +73,10 @@ class KeepTrackImporter:
     pass;
 
   def import_data(self):
+    """
+    Import data from KeepTrack XML file per the configuration specified in the constructor. Note - if the HDFQS data store is specified, data will be imported incrementally, i.e. only data after the last data point for each table will be imported.
+    """
+
     tree = et.parse(self.input_filename);
     root = tree.getroot();
 

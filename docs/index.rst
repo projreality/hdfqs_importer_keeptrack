@@ -3,20 +3,12 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to HDFQS KeepTrack Importer's documentation!
-====================================================
+HDFQS KeepTrack Importer
+========================
 
-Contents:
+.. automodule:: KeepTrackImporter
 
-.. toctree::
-   :maxdepth: 2
-
-
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+.. autoclass:: KeepTrackImporter
+    :special-members:
+    :members:
 

@@ -1,0 +1,4 @@
+HDFQS KeepTrack Importer
+========================
+
+This library contains the functionality to import KeepTrack XML files into HDFQS. It is used by :command:`hdfqs_import`, but can also be used to develop other programs.

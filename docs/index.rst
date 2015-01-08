@@ -9,5 +9,6 @@ HDFQS KeepTrack Importer
 .. toctree::
    :maxdepth: 2
 
+   downloads.rst
    api.rst
    config_file.rst

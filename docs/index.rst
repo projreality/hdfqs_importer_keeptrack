@@ -6,9 +6,8 @@
 HDFQS KeepTrack Importer
 ========================
 
-.. automodule:: KeepTrackImporter
+.. toctree::
+   :maxdepth: 2
 
-.. autoclass:: KeepTrackImporter
-    :special-members:
-    :members:
-
+   api.rst
+   config_file.rst

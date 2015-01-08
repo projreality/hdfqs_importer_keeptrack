@@ -45,10 +45,12 @@ class KeepTrackImporter:
         HDF5 file to write imported data to.
       tz : int
         Timezone of the imported data, specified in seconds west of UTC (i.e. west of UTC is positive, east of UTC is negative). Note - for regions with Daylight Saving Time, specify the Standard Time timezone, NOT the Daylight Time timezone, regardless of when the data was taken. For example, for Pacific Time, specify 28800 (8 hours), not 25200 (7 hours). Daylight Saving Time will be applied automatically.
+      c : str
+        Configuration file to use.
       p : str
         Path to HDFQS data store (for incremental import).
       nodst : bool
-        Do not apply Daylight Saving Time to timezone.
+        Do not apply Daylight Saving Time to timezone. Use this if you live in a region without DST, or if your region's DST rules are not supported in Python. In this case, you may need to apply DST manually to the table after the import, or import your taken during Daylight Time separately from data taken during Standard Time.
     """
 
     self.input_filename = config.input_filename;
@@ -74,7 +76,7 @@ class KeepTrackImporter:
 
   def import_data(self):
     """
-    Import data from KeepTrack XML file per the configuration specified in the constructor. Note - if the HDFQS data store is specified, data will be imported incrementally, i.e. only data after the last data point for each table will be imported.
+    Import data from KeepTrack XML file per the configuration specified in the constructor. Note - if the HDFQS data store is specified, data will be imported incrementally, i.e. only data after the latest data point for each table will be imported.
     """
 
     tree = et.parse(self.input_filename);

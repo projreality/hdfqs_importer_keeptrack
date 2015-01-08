@@ -12,3 +12,4 @@ HDFQS KeepTrack Importer
    downloads.rst
    api.rst
    config_file.rst
+   trackers.rst
